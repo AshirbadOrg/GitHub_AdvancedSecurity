@@ -1,0 +1,71 @@
+name: "SARIF Upload — Third-party Scan Results"
+
+on:
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: 'Scanning tool that generated the SARIF file'
+        required: true
+        type: choice
+        options:
+          - snyk
+          - semgrep
+          - trivy
+          - owasp-zap
+          - custom
+      sarif_path:
+        description: 'Path to SARIF file (relative to repo root)'
+        required: true
+        default: 'results.sarif'
+      category:
+        description: 'Category label shown in Security tab'
+        required: false
+        default: 'third-party-scan'
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  upload-sarif:
+    name: "Upload ${{ inputs.tool }} SARIF"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Snyk Code scan (generates SARIF)
+        if: inputs.tool == 'snyk' && env.SNYK_TOKEN != ''
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          npm install -g snyk
+          snyk code test --all-projects --sarif-file-output=${{ inputs.sarif_path }} || true
+
+      - name: Run Semgrep scan (generates SARIF)
+        if: inputs.tool == 'semgrep'
+        run: |
+          pip install semgrep
+          semgrep --config=auto --sarif --output=${{ inputs.sarif_path }} packages/api/src packages/client/src || true
+
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ inputs.sarif_path }}
+          category: "${{ inputs.tool }}-${{ inputs.category }}"
+
+      - name: Archive SARIF file
+        uses: actions/upload-artifact@v4
+        with:
+          name: "sarif-${{ inputs.tool }}-${{ github.run_id }}"
+          path: ${{ inputs.sarif_path }}
+          retention-days: 90
+
+      - name: Post upload summary
+        run: |
+          echo "## 📤 SARIF Upload — ${{ inputs.tool }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- File: \`${{ inputs.sarif_path }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Category: \`${{ inputs.tool }}-${{ inputs.category }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Findings visible in: **Security → Code scanning alerts**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Mapping reference: \`SECURITY-EVAL.md\`" >> "$GITHUB_STEP_SUMMARY"

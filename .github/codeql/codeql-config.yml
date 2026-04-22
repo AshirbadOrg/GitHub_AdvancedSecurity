@@ -1,0 +1,26 @@
+name: "TaskFlow — CodeQL Configuration"
+
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+query-filters:
+  - include:
+      tags contain: "security"
+  - include:
+      tags contain: "correctness"
+
+paths:
+  - packages/api/src
+  - packages/client/src
+
+paths-ignore:
+  - packages/api/src/database/seeders
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/*.test.js"
+  - "**/*.spec.js"
+
+packs:
+  - codeql/javascript-queries
+  - codeql/javascript-all
