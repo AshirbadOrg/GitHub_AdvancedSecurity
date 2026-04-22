@@ -1,0 +1,10 @@
+{
+  "name": "taskflow-monorepo",
+  "private": true,
+  "workspaces": ["packages/api", "packages/client"],
+  "scripts": {
+    "api": "npm run start --workspace=packages/api",
+    "client": "npm run dev --workspace=packages/client",
+    "dev:api": "npm run dev --workspace=packages/api"
+  }
+}
