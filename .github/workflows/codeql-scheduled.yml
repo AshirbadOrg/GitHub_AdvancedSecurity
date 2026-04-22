@@ -1,0 +1,92 @@
+name: "CodeQL — Scheduled Deep Scan"
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+  issues: write
+
+jobs:
+  deep-scan:
+    name: "Deep Scan — ${{ matrix.package }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [api, client]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - run: npm install
+
+      - name: Initialize CodeQL (deep scan)
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          config-file: .github/codeql/codeql-config.yml
+          queries: security-extended,security-and-quality
+
+      - uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        id: analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript/scheduled/${{ matrix.package }}"
+          output: sarif-results
+          upload: true
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "scheduled-sarif-${{ matrix.package }}-${{ github.run_id }}"
+          path: sarif-results/
+          retention-days: 90
+
+      - name: Open issue on new scheduled scan failures
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const title = `🚨 CodeQL scheduled scan findings — run ${context.runId}`;
+            const body = [
+              '## Scheduled CodeQL Scan — Findings Detected',
+              '',
+              '**Package:** `${{ matrix.package }}`',
+              `**Run:** ${context.runId}`,
+              '',
+              'Review findings in **Security → Code scanning alerts** and reconcile against `SECURITY-EVAL.md`.',
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['security', 'codeql', 'needs-triage'],
+            });
+
+      - name: Post scheduled summary
+        if: always()
+        run: |
+          echo "## 📅 Scheduled CodeQL Scan — ${{ matrix.package }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Queries: security-extended + security-and-quality" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SARIF retained for 90 days" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Findings mapped in SECURITY-EVAL.md" >> "$GITHUB_STEP_SUMMARY"

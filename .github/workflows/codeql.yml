@@ -1,0 +1,98 @@
+name: "CodeQL — SAST Scan"
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'packages/api/src/**'
+      - 'packages/client/src/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'packages/api/src/**'
+      - 'packages/client/src/**'
+  workflow_dispatch:
+    inputs:
+      debug_mode:
+        description: 'Enable CodeQL debug logging'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  analyze:
+    name: "CodeQL — ${{ matrix.package }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: api
+            path: packages/api
+            language: javascript
+          - package: client
+            path: packages/client
+            language: javascript
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          config-file: .github/codeql/codeql-config.yml
+          debug: ${{ github.event.inputs.debug_mode || 'false' }}
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}/package:${{ matrix.package }}"
+          output: sarif-results
+          upload: true
+
+      - name: Upload SARIF as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "codeql-sarif-${{ matrix.package }}"
+          path: sarif-results/
+          retention-days: 30
+
+      - name: Post scan summary
+        if: always()
+        run: |
+          echo "## 🔍 CodeQL Scan — ${{ matrix.package }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Package | \`${{ matrix.package }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Language | ${{ matrix.language }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Queries | security-extended + security-and-quality |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| SARIF | Uploaded to Security tab |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Mapped findings: [SECURITY-EVAL.md](./SECURITY-EVAL.md)" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,66 @@
+version: 2
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/packages/api"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+      - "packages/api"
+    commit-message:
+      prefix: "fix"
+      prefix-development: "chore"
+      include: "scope"
+    ignore:
+      - dependency-name: "axios"
+        versions: [">=0.22.0"]
+      - dependency-name: "jsonwebtoken"
+        versions: [">=9.0.0"]
+      - dependency-name: "sequelize"
+        versions: [">=6.7.0"]
+      - dependency-name: "dotenv"
+        versions: [">=9.0.0"]
+      - dependency-name: "helmet"
+        versions: [">=5.0.0"]
+      - dependency-name: "xml2js"
+        versions: [">=0.5.0"]
+
+  - package-ecosystem: "npm"
+    directory: "/packages/client"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+      - "packages/client"
+    ignore:
+      - dependency-name: "react"
+        versions: [">=18.0.0"]
+      - dependency-name: "react-dom"
+        versions: [">=18.0.0"]
+      - dependency-name: "vite"
+        versions: [">=3.0.0"]
+      - dependency-name: "axios"
+        versions: [">=0.22.0"]
+      - dependency-name: "react-router-dom"
+        versions: [">=6.0.0"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
